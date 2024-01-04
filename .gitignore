@@ -1,0 +1,6 @@
+__pycache__/
+examples/
+lib/__pycache__/
+venv/
+.env
+test.sh
