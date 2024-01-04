@@ -76,8 +76,8 @@ async def searchapi(q: str = Query(None, alias="search")):
             query=q,
             stop_sequences=[anthropic.HUMAN_PROMPT, 'END_OF_SEARCH'],
             model=ANTHROPIC_SEARCH_MODEL,
-            n_search_results_to_use=5,
-            max_searches_to_try=5,
+            n_search_results_to_use=20,
+            max_searches_to_try=1,
             max_tokens_to_sample=1000,
             score=0.8
         )
@@ -104,7 +104,7 @@ async def chatapi(q: str = Query(None, alias="q"), conversation_id: str = Query(
                 stop_sequences=[anthropic.HUMAN_PROMPT, 'END_OF_SEARCH'],
                 model=ANTHROPIC_SEARCH_MODEL,
                 n_search_results_to_use=5,
-                max_searches_to_try=5,
+                max_searches_to_try=1,
                 max_tokens_to_sample=1000),
             media_type="text/event-stream"
         )

@@ -66,6 +66,7 @@ Your friendly and funny response to the user's query with event lists
 <date>Event dates</date>
 <a class="event-link" href=<Event URL> target="_blank"><Event Name></a>
 <description>About Event</description>
+<search_quality>Reflect briefly about whether this event together provide enough information to help the user answer the query, or whether more information is needed.</search_quality>
 </event>
 """
 
@@ -214,6 +215,9 @@ class CrewfareChat(Anthropic):
                 all_raw_search_results += raw_search_results
             else:
                 break
+
+        for result in all_raw_search_results:
+            print(f"{format_content(result.content)}: {result.score}")
 
         return list(set([extractID(result.content) for result in all_raw_search_results if result.score >= score]))
     
