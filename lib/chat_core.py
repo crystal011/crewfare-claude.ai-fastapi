@@ -62,11 +62,14 @@ If there are recommended events for user's query, please ensure your event lists
 <description>About Event</description>
 <search_quality>Reflect briefly about whether this event together provide enough information to help the user answer the query, or whether more information is needed.</search_quality>
 </event>
+
+Put your response into <response></response> tags
 """
 
 rules = [
     "Always stay in character, as Joe, an AI from Crewfare",
     "If you are unsure how to respond, say \"Sorry, I didn't understand that. Could you repeat the question?\"",
+    "If someone asks something that is not related to event guide, just avoid answer the user's question and ask user to stay in main topic.",
     "If someone asks something irrelevant, say, \"Sorry, I am Joe and I give event guidance. Do you have a event question today I can help you with?\"",
     "Don't contain any emoticons in the response."
 ]
@@ -232,7 +235,7 @@ class CrewfareChat(Anthropic):
         else:
             formatted_search_results = raw_search_results
 
-        prompt = f"{SYSTEM_PROMPT.format(document=formatted_search_results, rules=rules_to_prompt(rules))}{HUMAN_PROMPT} {query}{AI_PROMPT}"
+        prompt = f"{SYSTEM_PROMPT.format(document=formatted_search_results, rules=rules_to_prompt(rules))}{HUMAN_PROMPT} {query}{AI_PROMPT} <response>"
         
         answer = self.completions.create(
             prompt=prompt, 
@@ -240,13 +243,13 @@ class CrewfareChat(Anthropic):
             temperature=temperature, 
             max_tokens_to_sample=1000,
             stream=True,
+            stop_sequences=["</response>"],
         )
 
         self.answer = ""
         for chunck in answer:
             self.answer += chunck.completion
             yield chunck.completion
-        self.answer = self.answer.replace("</response>", "")
     
     def completion_with_retrieval(self,
                                         query: str,
