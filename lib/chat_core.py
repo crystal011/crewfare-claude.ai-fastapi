@@ -53,14 +53,8 @@ Here is the event guide document you should reference when answering the user: <
 Here are some important rules for the interaction:
 <rules>{rules}</rules>
 
-Here is an example of how to respond in a standard interaction:
-<example>
-User: Hi, how were you created and what do you do?
-Joe: Hello! My name is Joe, and I was created by Crewfare to give event guide. What can I help you with today?
-</example>
-
-Please ensure your recommended event lists are in the following format:
-Your friendly and funny response to the user's query with event lists
+If there are recommended events for user's query, please ensure your event lists are in the following format:
+<search_query>Emphasize what the user wants in a friendly tone.<search_query>
 <event>
 <name>Event Name</name>
 <date>Event dates</date>
@@ -69,13 +63,6 @@ Your friendly and funny response to the user's query with event lists
 <search_quality>Reflect briefly about whether this event together provide enough information to help the user answer the query, or whether more information is needed.</search_quality>
 </event>
 """
-
-# Your reponse should be greeting and introduction followed by list of <event>.
-# <event> has following components in it.
-# - <name>: name of the <event>
-# - <date>: date of <event> happens
-# - <link>: link for the <event> booking
-# - <description>: description of the <event>.
 
 rules = [
     "Always stay in character, as Joe, an AI from Crewfare",
@@ -150,6 +137,11 @@ class CrewfareChat(Anthropic):
 
         description = self.search_tool.tool_description
         self.history += f"{HUMAN_PROMPT} {self.question}{AI_PROMPT} {self.answer}"
+        self.question = query
+
+        print('---------------------------------------')
+        print(self.history)
+        print('---------------------------------------')
         
         prompt = f"{HUMAN_PROMPT} {RETRIEVAL_PROMPT.format(query=query, description=description, history=self.history)}{AI_PROMPT}"
         token_budget = max_tokens_to_sample
@@ -250,9 +242,11 @@ class CrewfareChat(Anthropic):
             stream=True,
         )
 
+        self.answer = ""
         for chunck in answer:
-            # yield f"data: {chunck.completion.encode('utf-8')}\n"
-            yield chunck.completion.encode('utf-8')
+            self.answer += chunck.completion
+            yield chunck.completion
+        self.answer = self.answer.replace("</response>", "")
     
     def completion_with_retrieval(self,
                                         query: str,

@@ -2,13 +2,14 @@
 
 # Initialize x_chat_history_value with an empty string at the start
 x_chat_history_value=""
+NGROK_URL="https://787f-18-234-252-53.ngrok-free.app"
 
 # Function to perform search query
 search_query() {
     echo "Enter your search query:"
     read search
 
-    curl -X GET -G "https://d1cb-18-234-252-53.ngrok-free.app/query/" -H "accept: application/json" --data-urlencode "search=$search"
+    curl -X GET -G "$NGROK_URL/query/" -H "accept: application/json" --data-urlencode "search=$search"
 
     echo -e
 }
@@ -25,7 +26,7 @@ chat_question() {
     fi
 
     # Capture the response including headers and body
-    response=$(curl -s -i -X GET -G "https://d1cb-18-234-252-53.ngrok-free.app/chat/" -H "accept: application/json" --data-urlencode "q=$question" --data-urlencode "chatHistory=$x_chat_history_value")
+    response=$(curl -s -i -X GET -G "$NGROK_URL/chat/" -H "accept: application/json" --data-urlencode "q=$question" --data-urlencode "chatHistory=$x_chat_history_value")
 
     # Extract the response body without headers
     response_body=$(echo "$response" | awk '/^\r$/{flag=1;next}/^$/{flag=1;next}flag')
