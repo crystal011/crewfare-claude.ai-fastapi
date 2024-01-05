@@ -87,17 +87,19 @@ async def searchapi(q: str = Query(None, alias="search")):
         return {"message": "No query provided."}
 
 @app.get("/chat/")
-async def chatapi(q: str = Query(None, alias="q"), conversation_id: str = Query(None, alias="chatHistory")):
+async def chatapi(q: str = Query(None, alias="q"), token: str = Query(None, alias="chatHistory")):
     logger.info(q)
-    logger.info(conversation_id)
+    logger.info(token)
     if q:
-        if conversation_id is None or conversation_id == '':
-            conversation_id = generate_unique_number()
-        elif time.time() - float(conversation_id[64:]) > 600:
-            del user_bots[conversation_id]
-            conversation_id = generate_unique_number()
-        client = user_bots.get(conversation_id, CrewfareChat(api_key=os.environ['ANTHROPIC_API_KEY'], search_tool = event_search_tool, verbose = False))
-        user_bots[conversation_id] = client
+        if token is None or token == '':    # New user on website
+            token = generate_unique_number()
+        elif time.time() - float(token[64:]) > 600:   # Expire session time
+            del user_bots[token[:64]]
+            token = generate_unique_number()
+        else:
+            token = token[:64] + str(time.time())
+        client = user_bots.get(token[:64], CrewfareChat(api_key=os.environ['ANTHROPIC_API_KEY'], search_tool = event_search_tool, verbose = False))
+        user_bots[token[:64]] = client
         response = StreamingResponse(
             client.completion_with_retrieval(
                 query=q,
@@ -106,9 +108,9 @@ async def chatapi(q: str = Query(None, alias="q"), conversation_id: str = Query(
                 n_search_results_to_use=5,
                 max_searches_to_try=1,
                 max_tokens_to_sample=1000),
-            media_type="text/event-stream"
+            media_type="text/event-stream",
+            headers={ 'X-Chat-History': token }
         )
-        response.headers['X-Chat-History'] = conversation_id
 
         return response
     else:
