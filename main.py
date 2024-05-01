@@ -33,6 +33,9 @@ from lib.chat_core import CrewfareChat
 import time
 import random
 import hashlib
+from search.bot import Assistant
+
+search = Assistant()
 
 CORS_ALLOW_ORIGINS = os.environ.get("CORS_ALLOW_ORIGINS", "*")
 
@@ -72,15 +75,20 @@ async def welcome():
 async def searchapi(q: str = Query(None, alias="search")):
     logger.info(q)
     if q:
-        relevant_search_results = ai_engine.search(
-            query=q,
-            stop_sequences=[anthropic.HUMAN_PROMPT, 'END_OF_SEARCH'],
-            model=ANTHROPIC_SEARCH_MODEL,
-            n_search_results_to_use=20,
-            max_searches_to_try=1,
-            max_tokens_to_sample=1000,
-            score=0.8
-        )
+        # relevant_search_results = ai_engine.search(
+        #     query=q,
+        #     stop_sequences=[anthropic.HUMAN_PROMPT, 'END_OF_SEARCH'],
+        #     model=ANTHROPIC_SEARCH_MODEL,
+        #     n_search_results_to_use=20,
+        #     max_searches_to_try=1,
+        #     max_tokens_to_sample=1000,
+        #     score=0.8
+        # )
+
+        # relevant_search_results = search.run(q)
+
+        relevant_search_results = search.run(q)
+        print(relevant_search_results)
 
         return {"message": relevant_search_results}
     else:

@@ -2,12 +2,14 @@
 
 # Initialize x_chat_history_value with an empty string at the start
 x_chat_history_value=""
-NGROK_URL="https://787f-18-234-252-53.ngrok-free.app"
+NGROK_URL="https://8fe6-18-234-252-53.ngrok-free.app"
 
 # Function to perform search query
 search_query() {
     echo "Enter your search query:"
     read search
+
+    # curl -X GET -G "https://manage.crewfare.com/" -H "accept: application/json" --data-urlencode "test_execution_time=true" --data-urlencode "search_term=$search"
 
     curl -X GET -G "$NGROK_URL/query/" -H "accept: application/json" --data-urlencode "search=$search"
 

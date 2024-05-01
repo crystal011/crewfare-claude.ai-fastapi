@@ -4,6 +4,7 @@ from .types import SearchTool, SearchResult
 from .utils import format_results_full
 import logging
 import re
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -11,10 +12,6 @@ RETRIEVAL_PROMPT = """
 You will be given a query by a human user. Your job is solely to gather information from an external knowledge base that would help the user answer the query. To gather this information, you have been equipped with a search engine tool that you can use to query the external knowledge base. Here is a description of the search engine tool: <tool_description>{description}</tool_description>
 
 You can make a call to the search engine tool by inserting a query within <search_query> tags like so: <search_query>query</search_query>. You'll then get results back within <search_result></search_result> tags. After these results back within, reflect briefly inside <search_quality></search_quality> tags about whether all the results together provide enough information to help the user answer the query, or whether more information is needed.
-
-Before beginning to research the query, first think for a moment inside <thinking></thinking> tags about what information is necessary to gather to create a well-informed answer. 
-
-If the query is complex, you may need to decompose the query into multiple subqueries and execute them individually. Sometimes the search engine will return empty search results, or the search results may not contain the information you need. In such cases, feel free to search again with a different query.
 
 Do not try to answer the query. Your only job is to gather relevant search results that will help the user answer the query.
 
@@ -29,49 +26,43 @@ Here is the human's next reply:
 </human_reply>
 """
 
-SEARCH_PROMPT = """
-You will be given a query by a human user. Your job is solely to gather information from an external knowledge base that would help the user answer the query. To gather this information, you have been equipped with a search engine tool that you can use to query the external knowledge base. Here is a description of the search engine tool: <tool_description>{description}</tool_description>
-
-You can make a call to the search engine tool by inserting a query within <search_query> tags like so: <search_query>query</search_query>. You'll then get results back within <search_result></search_result> tags. After these results back within, reflect briefly inside <search_quality></search_quality> tags about whether all the results together provide enough information to help the user answer the query, or whether more information is needed.
-
-Before beginning to research the query, first think for a moment inside <thinking></thinking> tags about what information is necessary to gather to create a well-informed answer. 
-
-If the query is complex, you may need to decompose the query into multiple subqueries and execute them individually. Sometimes the search engine will return empty search results, or the search results may not contain the information you need. In such cases, feel free to search again with a different query.
-
-Do not try to answer the query. Your only job is to gather relevant search results that will help the user answer the query.
-
-Here is the query: <query>{query}</query> 
-"""
-
 SYSTEM_PROMPT = """
-You will be acting as an AI event guide named Joe created by the company Crewfare. Your goal is to answer user's query and provide them helpful events. You will be replying to users who are on the Crewfare site and who will be confused if you don't respond in the character of Joe.
+I want you to act as a travel guide and help me plan an amazing trip. I will provide location I am traveling to and you will suggest events to enjoy during trip. In some cases, I will also give you the type of events I would like to enjoy. You will also suggest me events of similar type that are close to my first location. I am also providing the month I am going so if you can help me find things to do during specific months please add those too.
 
-You should maintain a friendly customer service tone.
-
-Here is the event guide document you should reference when answering the user: <guide>{document}</guide>
+Here is the event document you should reference when answering the user:
+{document}
 
 Here are some important rules for the interaction:
 <rules>{rules}</rules>
 
-If there are recommended events for user's query, please ensure your event lists are in the following format:
-<search_query>Emphasize what the user wants in a friendly tone.<search_query>
-<event>
-<name>Event Name</name>
-<date>Event dates</date>
-<a class="event-link" href=<Event URL> target="_blank"><Event Name></a>
-<description>About Event</description>
-<search_quality>Reflect briefly about whether this event together provide enough information to help the user answer the query, or whether more information is needed.</search_quality>
-</event>
-
-Put your response into <response></response> tags
+Put your response into <response></response> tags.
 """
+
+# You will be acting as an AI event guide named Joe created by the company Crewfare. Your goal is to answer user's query and provide them helpful events. You will be replying to users who are on the Crewfare site and who will be confused if you don't respond in the character of Joe.
+
+# You should maintain a friendly customer service tone.
+
+# If there are recommended events for user's query, please ensure your event lists are in the following format and reflect briefly into <search_quality></search_quality> tag about whether this event together provide enough information to help the user answer the query, or whether more information is needed.:
+# <search_query>Emphasize what the user wants in a friendly tone.<search_query>
+# <event>
+# <div class="event-wrapper">
+# <name>Event Name</name>
+# <date>Event dates</date>
+# <a class="event-link" href="<Event URL>" target="_blank">Book Now</a>
+# </div>
+# <description>About Event</description>
+# <search_quality>searh quality</search_quality>
+# </event>
+
+# Put your response into <response></response> tags
 
 rules = [
     "Always stay in character, as Joe, an AI from Crewfare",
     "If you are unsure how to respond, say \"Sorry, I didn't understand that. Could you repeat the question?\"",
     "If someone asks something that is not related to event guide, just avoid answer the user's question and ask user to stay in main topic.",
     "If someone asks something irrelevant, say, \"Sorry, I am Joe and I give event guidance. Do you have a event question today I can help you with?\"",
-    "Don't contain any emoticons in the response."
+    "Don't contain any emoticons in the response.",
+    "The output must be systemized"
 ]
 
 def rules_to_prompt(data: list) -> str:
@@ -90,15 +81,34 @@ def extractID(content: str) -> str:
     return ret
 
 def format_content(content: str) -> str:
-    titles = content.split("\n\n")
+    data = content.split("\n\n")
     ret = {}
-    if isinstance(titles, list):
-        if len(titles) > 2:
-            ret[titles[0].split(': ')[0]] = titles[0].split(': ')[1]
-            ret[titles[1].split(': ')[0]] = titles[1].split(': ')[1]
-            ret[titles[2].split(': ')[0]] = titles[2].split(': ')[1]
+    for dt in data:
+        key = dt.split(': ')[0]
+        value = ': '.join(dt.split(': ')[1:])
+        ret[key] = value
 
     return ret
+
+def lookahead(iterable):
+    """Convert an iterable into an iterator that allows looking ahead one element."""
+    it = iter(iterable)
+    last_value = next(it)
+    for value in it:
+        yield last_value, False
+        last_value = value
+    yield last_value, True
+
+def documents_to_prompt(data: list[SearchResult], filter: list) -> str:
+    prompt = '<documents>\n'
+    for document in data:
+        prompt += "<document>\n"
+        for key in filter:
+            dt = format_content(document.content)
+            prompt += f"<{str(key)}>\n{dt.get(key, '')}\n</{str(key)}>\n"
+        prompt += "</document>\n"
+    prompt += "</documents>"
+    return prompt
 
 class CrewfareChat(Anthropic):
 
@@ -167,55 +177,6 @@ class CrewfareChat(Anthropic):
             else:
                 break
         return all_raw_search_results
-
-    def search(self,
-                       query: str,
-                       model: str,
-                       n_search_results_to_use: int = 3,
-                       stop_sequences: list[str] = [HUMAN_PROMPT],
-                       max_tokens_to_sample: int = 1000,
-                       max_searches_to_try: int = 5,
-                       temperature: float = 1.0,
-                       score=0.8) -> list[SearchResult]:
-        """
-        Main method to retrieve relevant search results for a query with a provided search tool.
-        
-        Constructs RETRIEVAL prompt with query and search tool description. 
-        Keeps sampling Claude completions until stop sequence hit.
-        Extracts search results and accumulates all raw results.
-        
-        Returns:
-            list[SearchResult]: List of all raw search results
-        """
-        assert self.search_tool is not None, "SearchTool must be provided to use .retrieve()"
-
-        description = self.search_tool.tool_description
-        
-        prompt = f"{HUMAN_PROMPT} {SEARCH_PROMPT.format(query=query, description=description)}{AI_PROMPT}"
-        token_budget = max_tokens_to_sample
-        all_raw_search_results: list[SearchResult] = []
-        for tries in range(max_searches_to_try):
-            partial_completion = self.completions.create(prompt = prompt,
-                                                     stop_sequences=stop_sequences + ['</search_query>'],
-                                                     model=model,
-                                                     max_tokens_to_sample = token_budget,
-                                                     temperature = temperature)
-            partial_completion, stop_reason, stop_seq = partial_completion.completion, partial_completion.stop_reason, partial_completion.stop # type: ignore
-            logger.info(partial_completion)
-            token_budget -= self.count_tokens(partial_completion)
-            prompt += partial_completion
-            if stop_reason == 'stop_sequence' and stop_seq == '</search_query>':
-                logger.info(f'Attempting search number {tries}.')
-                raw_search_results, formatted_search_results = self._search_query_stop(partial_completion, n_search_results_to_use)
-                prompt += '</search_query>' + formatted_search_results
-                all_raw_search_results += raw_search_results
-            else:
-                break
-
-        for result in all_raw_search_results:
-            print(f"{format_content(result.content)}: {result.score}")
-
-        return list(set([extractID(result.content) for result in all_raw_search_results if result.score >= score]))
     
     def answer_with_results(self, raw_search_results: list[str]|list[SearchResult], query: str, model: str, temperature: float, format_results: bool =False):
         """Generates an RAG response based on search results and a query. If format_results is True,
@@ -235,7 +196,8 @@ class CrewfareChat(Anthropic):
         else:
             formatted_search_results = raw_search_results
 
-        prompt = f"{SYSTEM_PROMPT.format(document=formatted_search_results, rules=rules_to_prompt(rules))}{HUMAN_PROMPT} {query}{AI_PROMPT} <response>"
+        document = documents_to_prompt(formatted_search_results, ['Event Name', 'Event Location', 'Event Dates', 'Event End Dates', 'About Event'])
+        prompt = f"{SYSTEM_PROMPT.format(document=document, rules=rules_to_prompt(rules))}{HUMAN_PROMPT} {query}{AI_PROMPT} <response>"
         
         answer = self.completions.create(
             prompt=prompt, 
@@ -247,10 +209,39 @@ class CrewfareChat(Anthropic):
         )
 
         self.answer = ""
-        for chunck in answer:
-            self.answer += chunck.completion
-            yield chunck.completion
+        
+        first_chunk = True
+        potential_end_chunks = []
+        for chunk, is_last in lookahead(answer):
+            chunked = chunk.completion
+
+            if not first_chunk and not chunked.strip():
+                potential_end_chunks.append(chunked)
+
+            else:
+                if first_chunk:
+                    chunked = chunked.lstrip()
+                    first_chunk = False
+
+                # if is_last:
+                #     chunked = chunked.rstrip()
+
+                self.answer += ''.join(potential_end_chunks) + chunked
+                potential_end_chunks = []
+
+                yield f"data: {json.dumps({'chunk': chunked})}\n\n".encode("utf-8")
+
+        print(self.answer)
+
+        # for i, chunk in enumerate(answer):
+        #     chunked = chunk.completion
+        #     if i == 0:
+        #         chunked = chunked.lstrip()
+        #     self.answer += chunked
+        #     yield f"data: {json.dumps({'chunk': chunked})}\n\n".encode("utf-8")
     
+        # print(self.answer)
+
     def completion_with_retrieval(self,
                                         query: str,
                                         model: str,
@@ -274,6 +265,7 @@ class CrewfareChat(Anthropic):
                                                  max_searches_to_try=max_searches_to_try,
                                                  temperature=temperature)
 
+        print('Generating text ... ')
         answer = self.answer_with_results(search_results, query, model, temperature)
         return answer
     

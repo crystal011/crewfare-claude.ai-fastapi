@@ -62,8 +62,20 @@ def export_data_from_mysql(query: str, file: str, config: dict) -> bool:
         for dt in data:
             record = list(map(lambda x: '' if x is None else x, list(dt)))
 
+            # row = {
+            #     'text': f'ID: {record[0]}\n\nEvent Name: {record[1]}\n\nEvent Location: {record[2]}\n\nEvent Dates: {format_date(record[3])}\n\nEvent End Dates: {format_date(record[5])}\n\nAbout Event: {record[4]}\n\nEvent Type: {record[6]}\n\nEvent Category: {record[7]}\n\nEvent URL: {record[8]}'
+            # }
+
             row = {
-                'text': f'ID: {record[0]}\n\nEvent Name: {record[1]}\n\nEvent Location: {record[2]}\n\nEvent Dates: {format_date(record[3])}\n\nEvent End Dates: {format_date(record[5])}\n\nAbout Event: {record[4]}\n\nEvent Type: {record[6]}\n\nEvent Category: {record[7]}\n\nEvent URL: {record[8]}'
+                "ID": record[0],
+                "Event Name": record[1],
+                "Event Location": record[2],
+                "Event Dates": format_date(record[3]), 
+                "Event End Dates": format_date(record[5]), 
+                "About Event": record[4], 
+                "Event Type": record[6], 
+                "Event Category": record[7], 
+                "Event URL": record[8]
             }
 
             f.write(json.dumps(row) + '\n')
